@@ -2,150 +2,263 @@ import React from 'react';
 import ReactDOM from 'react-dom';
 import './index.css';
 
-function Square(props) {
-  return (
-    <button className="square" onClick={props.onClick}>
-      {props.value}
-    </button>
-  );
-}
-  
-  class Board extends React.Component {
-   
-    renderSquare(i) {
-      return (
-      <Square
-       value={this.props.squares[i]}
-       onClick={() => this.props.onClick(i)} 
-      />
-      );
-    }
 
-    render() {
-      return (
-        <div>
-          <div className="board-row">
-            {this.renderSquare(0)}
-            {this.renderSquare(1)}
-            {this.renderSquare(2)}
-          </div>
-          <div className="board-row">
-            {this.renderSquare(3)}
-            {this.renderSquare(4)}
-            {this.renderSquare(5)}
-          </div>
-          <div className="board-row">
-            {this.renderSquare(6)}
-            {this.renderSquare(7)}
-            {this.renderSquare(8)}
-          </div>
-        </div>
-      );
-    }
+class App extends React.Component {
+  constructor(props) {
+    super(props);
+    
+    this.state = {
+      player1: 1,
+      player2: 2,
+      currentPlayer: null,
+      board: [],
+      gameOver: false,
+      message: ''
+    };
+    
+    // Bind play function to App component
+    this.play = this.play.bind(this);
   }
   
-  class Game extends React.Component {
-    constructor(props) {
-      super(props);
-      this.state = {
-        history: [{
-          squares: Array(9).fill(null),
-        }],
-        stepNumber: 0,
-        xIsNext: true,
-      };
+  // Starts new game
+  initBoard() {
+    // Create a blank 6x7 matrix
+    let board = [];
+    for (let r = 0; r < 6; r++) {
+      let row = [];
+      for (let c = 0; c < 7; c++) { row.push(null) }
+      board.push(row);
     }
-
-    handleClick(i) {
-      const history = this.state.history.slice(0, this.state.stepNumber + 1);
-      const current = history[history.length - 1];
-      const squares = current.squares.slice();
-
-      if (calculateWinner(squares) || squares[i]) {
-        return;
-      }
-      squares[i] = this.state.xIsNext ? 'X' : 'O';
-      this.setState({
-        history: history.concat([{
-          squares: squares
-        }]),
-        stepNumber: history.length,
-        xIsNext: !this.state.xIsNext,
-      });
-    }
-
-    jumpTo(step) {
-      this.setState({
-        stepNumber: step,
-        xIsNext: (step % 2) === 0
-      });
-    }
-
-    render() {
-
-      const history = this.state.history;
-      const current = history[this.state.stepNumber];
-      const winner = calculateWinner(current.squares);
-
-      const moves = history.map((step, move) => {
-      const desc = move ?
-        'Go to move #' + move :
-        'Go to game start';
-      return (
-        <li key={move}>
-          <button onClick={() => this.jumpTo(move)}>{desc}</button>
-        </li>
-      );
+    
+    this.setState({
+      board,
+      currentPlayer: this.state.player1,
+      gameOver: false,
+      message: ''
     });
+  }
+  
+  togglePlayer() {
+    return (this.state.currentPlayer === this.state.player1) ? this.state.player2 : this.state.player1;
+  }
+  
+  play(c) {
+    if (!this.state.gameOver) {
+      // Place piece on board
+      let board = this.state.board;
+      for (let r = 5; r >= 0; r--) {
+        if (!board[r][c]) {
+          board[r][c] = this.state.currentPlayer;
+          break;
+        }
+      }
 
-
-    let status;
-    if (winner) {
-      status = 'Winner: ' + winner;
+      // Check status of board
+      let result = this.checkAll(board);
+      if (result === this.state.player1) {
+        this.setState({ board, gameOver: true, message: 'Player 1 (red) wins!' });
+      } else if (result === this.state.player2) {
+        this.setState({ board, gameOver: true, message: 'Player 2 (blue) wins!' });
+      } else if (result === 'draw') {
+        this.setState({ board, gameOver: true, message: 'Draw game.' });
+      } else {
+        this.setState({ board, currentPlayer: this.togglePlayer() });
+      }
     } else {
-      status = 'Next player: ' + (this.state.xIsNext ? 'X' : 'O');
-    }
-
-      return (
-        <div className="game">
-          <div className="game-board">
-            <Board 
-             squares={current.squares}
-             onClick={(i) => this.handleClick(i)}
-             />
-          </div>
-          <div className="game-info">
-            <div>{ status }</div>
-            <ol>{ moves }</ol>
-          </div>
-        </div>
-      );
+      this.setState({ message: 'Game over. Please start a new game.' });
     }
   }
   
-  // ========================================
-  
-  ReactDOM.render(
-    <Game />,
-    document.getElementById('root')
-  );
-  
-  function calculateWinner(squares) {
-    const lines = [
-      [0, 1, 2],
-      [3, 4, 5],
-      [6, 7, 8],
-      [0, 3, 6],
-      [1, 4, 7],
-      [2, 5, 8],
-      [0, 4, 8],
-      [2, 4, 6],
-    ];
-    for (let i = 0; i < lines.length; i++) {
-      const [a, b, c] = lines[i];
-      if (squares[a] && squares[a] === squares[b] && squares[a] === squares[c]) {
-        return squares[a];
+  checkVertical(board) {
+    // Check only if row is 3 or greater
+    for (let r = 3; r < 6; r++) {
+      for (let c = 0; c < 7; c++) {
+        if (board[r][c]) {
+          if (board[r][c] === board[r - 1][c] &&
+              board[r][c] === board[r - 2][c] &&
+              board[r][c] === board[r - 3][c]) {
+            return board[r][c];    
+          }
+        }
       }
     }
-    return null;
   }
+  
+  checkHorizontal(board) {
+    // Check only if column is 3 or less
+    for (let r = 0; r < 6; r++) {
+      for (let c = 0; c < 4; c++) {
+        if (board[r][c]) {
+          if (board[r][c] === board[r][c + 1] && 
+              board[r][c] === board[r][c + 2] &&
+              board[r][c] === board[r][c + 3]) {
+            return board[r][c];
+          }
+        }
+      }
+    }
+  }
+  
+  checkDiagonalRight(board) {
+    // Check only if row is 3 or greater AND column is 3 or less
+    for (let r = 3; r < 6; r++) {
+      for (let c = 0; c < 4; c++) {
+        if (board[r][c]) {
+          if (board[r][c] === board[r - 1][c + 1] &&
+              board[r][c] === board[r - 2][c + 2] &&
+              board[r][c] === board[r - 3][c + 3]) {
+            return board[r][c];
+          }
+        }
+      }
+    }
+  }
+  
+  checkDiagonalLeft(board) {
+    // Check only if row is 3 or greater AND column is 3 or greater
+    for (let r = 3; r < 6; r++) {
+      for (let c = 3; c < 7; c++) {
+        if (board[r][c]) {
+          if (board[r][c] === board[r - 1][c - 1] &&
+              board[r][c] === board[r - 2][c - 2] &&
+              board[r][c] === board[r - 3][c - 3]) {
+            return board[r][c];
+          }
+        }
+      }
+    }
+  }
+  
+  checkDraw(board) {
+    for (let r = 0; r < 6; r++) {
+      for (let c = 0; c < 7; c++) {
+        if (board[r][c] === null) {
+          return null;
+        }
+      }
+    }
+    return 'draw';    
+  }
+  
+  checkAll(board) {
+    return this.checkVertical(board) || this.checkDiagonalRight(board) || this.checkDiagonalLeft(board) || this.checkHorizontal(board) || this.checkDraw(board);
+  }
+  
+  componentWillMount() {
+    this.initBoard();
+  }
+  
+  render() {
+    return (
+      <div>
+        <div className="button" onClick={() => {this.initBoard()}}>New Game</div>
+        
+        <table>
+          <thead>
+          </thead>
+          <tbody>
+            {this.state.board.map((row, i) => (<Row key={i} row={row} play={this.play} />))}
+          </tbody>
+        </table>
+        
+        <p className="message">{this.state.message}</p>
+      </div>
+    );
+  }
+}
+/*
+//history of moves attempt
+class Game extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = {
+      history: [{
+        squares: Array(42).fill(null),
+      }],
+      stepNumber: 0,
+      xIsNext: true,
+    };
+  }
+
+  handleClick(i) {
+    const history = this.state.history.slice(0, this.state.stepNumber + 1);
+    const current = history[history.length - 1];
+    const squares = current.squares.slice();
+
+    squares[i] = this.state.xIsNext ? 'red' : 'blue';
+    this.setState({
+      history: history.concat([{
+        squares: squares
+      }]),
+      stepNumber: history.length,
+      xIsNext: !this.state.xIsNext,
+    });
+  }
+
+  jumpTo(step) {
+    this.setState({
+      stepNumber: step,
+      xIsNext: (step % 2) === 0
+    });
+  }
+
+  render() {
+
+    const history = this.state.history;
+    const current = history[this.state.stepNumber];
+  
+    const moves = history.map((step, move) => {
+    const desc = move ?
+      'Go to move #' + move: 'History'
+    
+    return (
+      <li key={move}>
+        <button onClick={() => this.jumpTo(move)}>{desc}</button>
+      </li>
+    );
+  });
+
+
+  return (
+    <div>
+        <App 
+         squares={current.squares}
+         onClick={(i) => this.handleClick(i)}
+         />
+        <ol>{ moves }</ol>
+      </div>
+  );
+
+  }
+}
+
+*/
+
+
+// Row component
+const Row = ({ row, play }) => {
+  return (
+    <tr>
+      {row.map((cell, i) => <Cell key={i} value={cell} columnIndex={i} play={play} />)}
+    </tr>
+  );
+};
+
+const Cell = ({ value, columnIndex, play }) => {
+  let color = 'white';
+  if (value === 1) {
+    color = 'red';
+  } else if (value === 2) {
+    color = 'blue';
+  }
+    
+  return (
+    <td>
+      <div className="cell" onClick={() => {play(columnIndex)}}>
+        <div className={color}></div>
+      </div>
+    </td>
+  );
+};
+
+ReactDOM.render(<App /> ,document.getElementById('root'));
